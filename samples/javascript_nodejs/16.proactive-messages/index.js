@@ -13,6 +13,7 @@ const { BotFrameworkAdapter } = require('botbuilder');
 
 // This bot's main dialog.
 const { ProactiveBot } = require('./bots/proactiveBot');
+const { sendProactiveMessages } = require('./bots/proactiveMessageSender');
 
 // Note: Ensure you have a .env file and include the MicrosoftAppId and MicrosoftAppPassword.
 const ENV_FILE = path.join(__dirname, '.env');
@@ -57,7 +58,7 @@ server.listen(process.env.port || process.env.PORT || 3978, function() {
     console.log('\nTo talk to your bot, open the emulator select "Open Bot"');
 });
 
-// Listen for incoming activities and route them to your bot main dialog.
+// Listen for incoming activities and route them to the bot main dialog.
 server.post('/api/messages', (req, res) => {
     adapter.processActivity(req, res, async (turnContext) => {
         // route to main dialog.
@@ -67,16 +68,13 @@ server.post('/api/messages', (req, res) => {
 
 // Listen for incoming notifications and send proactive messages to users.
 server.get('/api/notify', async (req, res) => {
-    for (const conversationReference of Object.values(conversationReferences)) {
-        await adapter.continueConversation(conversationReference, async turnContext => {
-            // If you encounter permission-related errors when sending this message, see
-            // https://aka.ms/BotTrustServiceUrl
-            await turnContext.sendActivity('proactive hello');
-        });
-    }
+    const summary = await sendProactiveMessages({
+        conversationReferences,
+        continueConversation: (reference, callback) => adapter.continueConversation(reference, callback),
+        logger: console
+    });
 
-    res.setHeader('Content-Type', 'text/html');
-    res.writeHead(200);
-    res.write('<html><body><h1>Proactive messages have been sent.</h1></body></html>');
-    res.end();
+    // Report partial or total delivery failures instead of returning a success page.
+    const statusCode = summary.failed === 0 ? 200 : (summary.sent > 0 ? 207 : 502);
+    res.send(statusCode, summary);
 });
