@@ -10,13 +10,19 @@ async function runTests() {
     // A failed conversation must not prevent later conversations from being attempted.
     const attempted = [];
     const summary = await sendProactiveMessages({
-        conversationReferences: { first: { id: 'first' }, second: { id: 'second' }, third: { id: 'third' } },
+        conversationReferences: {
+            first: { id: 'first' },
+            second: { id: 'second' },
+            third: { id: 'third' }
+        },
         continueConversation: async (reference, callback) => {
             attempted.push(reference.id);
             if (reference.id === 'second') {
                 throw new Error('simulated delivery failure');
             }
-            await callback({ sendActivity: async message => assert.strictEqual(message, 'proactive hello') });
+            await callback({
+                sendActivity: async message => assert.strictEqual(message, 'proactive hello')
+            });
         },
         logger
     });
@@ -24,7 +30,7 @@ async function runTests() {
     assert.deepStrictEqual(attempted, ['first', 'second', 'third']);
     assert.deepStrictEqual(summary, { attempted: 3, sent: 2, failed: 1 });
     assert.strictEqual(errors.length, 1);
-    assert.match ? assert.match(String(errors[0][1]), /simulated delivery failure/) : assert.ok(String(errors[0][1]).includes('simulated delivery failure'));
+    assert.ok(String(errors[0][1]).includes('simulated delivery failure'));
 
     // Empty input is a successful no-op.
     const emptySummary = await sendProactiveMessages({
